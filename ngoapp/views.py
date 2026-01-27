@@ -70,7 +70,32 @@ class LoginAPIView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+class RefreshTokenAPIView(APIView):
+    def post(self, request):
+        refresh_token = request.data.get("refresh")
 
+        if not refresh_token:
+            return Response(
+                {"error": "Refresh token is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            refresh = RefreshToken(refresh_token)
+            access = refresh.access_token
+
+            return Response(
+                {
+                    "access": str(access)
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except TokenError:
+            return Response(
+                {"error": "Invalid or expired refresh token"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 class MemberRegAPIView(APIView):
 
     def get_permissions(self):
