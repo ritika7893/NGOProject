@@ -1,8 +1,8 @@
 from django.shortcuts import render
 
-from ngoapp.serializers import MemberRegSerializer
+from ngoapp.serializers import ActivitySerializer, AssociativeWingsSerializer, DonationSerializer, MemberRegSerializer
 
-from .models import AllLog, MemberReg
+from .models import Activity, AllLog, AssociativeWings, Donation, MemberReg
 from .permissions import IsAdminRole
 from django.shortcuts import render
 from rest_framework.views import APIView
@@ -157,6 +157,238 @@ class MemberRegAPIView(APIView):
             serializer.save()
             return Response(
                 {"success": True, "message": "Member updated successfully"}
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+
+class AssociativeWingsAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
+
+    def get(self, request):
+        wing_id = request.query_params.get("id")
+
+        if wing_id:
+            try:
+                wing = AssociativeWings.objects.get(id=wing_id)
+                serializer = AssociativeWingsSerializer(wing)
+                return Response({"success": True, "data": serializer.data})
+            except AssociativeWings.DoesNotExist:
+                return Response(
+                    {"success": False, "message": "Associative wing not found"},
+                    status=404
+                )
+
+        wings = AssociativeWings.objects.all().order_by("-id")
+        serializer = AssociativeWingsSerializer(wings, many=True)
+        return Response({"success": True, "data": serializer.data})
+
+    def post(self, request):
+        serializer = AssociativeWingsSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "success": True,
+                    "message": "Associative wing created successfully"
+                },
+                status=201
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+
+    def put(self, request):
+        wing_id = request.data.get("id")
+        if not wing_id:
+            return Response(
+                {"success": False, "message": "ID is required"},
+                status=400
+            )
+
+        try:
+            wing = AssociativeWings.objects.get(id=wing_id)
+        except AssociativeWings.DoesNotExist:
+            return Response(
+                {"success": False, "message": "Associative wing not found"},
+                status=404
+            )
+
+        serializer = AssociativeWingsSerializer(
+            wing, data=request.data, partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "success": True,
+                    "message": "Associative wing updated successfully"
+                }
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+
+    def delete(self, request):
+        wing_id = request.data.get("id")
+        if not wing_id:
+            return Response(
+                {"success": False, "message": "ID is required"},
+                status=400
+            )
+
+        try:
+            AssociativeWings.objects.get(id=wing_id).delete()
+            return Response(
+                {
+                    "success": True,
+                    "message": "Associative wing deleted successfully"
+                }
+            )
+        except AssociativeWings.DoesNotExist:
+            return Response(
+                {"success": False, "message": "Associative wing not found"},
+                status=404
+            )
+class ActivityAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
+
+    def get(self, request):
+        activity_id = request.query_params.get("activity_id")
+
+        if activity_id:
+            activity = Activity.objects.filter(activity_id=activity_id).first()
+            if not activity:
+                return Response(
+                    {"success": False, "message": "Activity not found"},
+                    status=404
+                )
+
+            return Response(
+                {"success": True, "data": ActivitySerializer(activity).data}
+            )
+
+        activities = Activity.objects.all().order_by("-id")
+        return Response(
+            {"success": True, "data": ActivitySerializer(activities, many=True).data}
+        )
+
+    def post(self, request):
+        serializer = ActivitySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"success": True, "message": "Activity created successfully"},
+                status=201
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+
+    def put(self, request):
+        activity_id = request.data.get("activity_id")
+        if not activity_id:
+            return Response(
+                {"success": False, "message": "activity_id is required"},
+                status=400
+            )
+
+        activity = Activity.objects.filter(activity_id=activity_id).first()
+        if not activity:
+            return Response(
+                {"success": False, "message": "Activity not found"},
+                status=404
+            )
+
+        serializer = ActivitySerializer(activity, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"success": True, "message": "Activity updated successfully"}
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+
+    def delete(self, request):
+        activity_id = request.data.get("activity_id")
+        if not activity_id:
+            return Response(
+                {"success": False, "message": "activity_id is required"},
+                status=400
+            )
+
+        deleted, _ = Activity.objects.filter(activity_id=activity_id).delete()
+        if not deleted:
+            return Response(
+                {"success": False, "message": "Activity not found"},
+                status=404
+            )
+
+        return Response(
+            {"success": True, "message": "Activity deleted successfully"}
+        )
+class DonationAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [AllowAny()]          # anyone can donate
+        return [IsAdminRole()]  
+    
+    def get(self, request):
+        donation_id = request.query_params.get("donation_id")
+        activity_id = request.query_params.get("activity_id")
+
+       
+        if donation_id:
+            donation = Donation.objects.filter(donation_id=donation_id).first()
+            if not donation:
+                return Response(
+                    {"success": False, "message": "Donation not found"},
+                    status=404
+                )
+
+            return Response(
+                {"success": True, "data": DonationSerializer(donation).data}
+            )
+
+      
+        donations = Donation.objects.all()
+
+        if activity_id:
+            donations = donations.filter(activity_id=activity_id)
+
+        donations = donations.order_by("-created_at")
+
+        return Response(
+            {"success": True, "data": DonationSerializer(donations, many=True).data}
+        )
+
+    def post(self, request):
+        serializer = DonationSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(status="PENDING")
+            return Response(
+                {"success": True, "message": "Donation created successfully"},
+                status=201
             )
 
         return Response(

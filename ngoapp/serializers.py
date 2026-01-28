@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-from .models import MemberReg, AllLog
+from .models import Activity, AssociativeWings, Donation, MemberReg, AllLog
  # adjust import path if needed
-
+from django.utils import timezone
 
 class MemberRegSerializer(serializers.ModelSerializer):
     class Meta:
@@ -49,3 +49,39 @@ class MemberRegSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+class AssociativeWingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssociativeWings
+        fields = "__all__"
+        read_only_fields = ["id","created_at","updated_at"]
+
+class ActivitySerializer(serializers.ModelSerializer):
+    is_past = serializers.SerializerMethodField()
+    is_present = serializers.SerializerMethodField()
+    is_upcoming = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Activity
+        fields = "__all__"
+        read_only_fields = ["activity_id", "is_past", "is_present", "is_upcoming",]
+
+    def get_is_past(self, obj):
+        if not obj.activity_date_time:
+            return False
+        return obj.activity_date_time.date() < timezone.now().date()
+
+    def get_is_present(self, obj):
+        if not obj.activity_date_time:
+            return False
+        return obj.activity_date_time.date() == timezone.now().date()
+
+    def get_is_upcoming(self, obj):
+        if not obj.activity_date_time:
+            return False
+        return obj.activity_date_time.date() > timezone.now().date()
+    
+class DonationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Donation
+        fields = "__all__"
+        read_only_fields = ["status", "payment_reference", "created_at"]

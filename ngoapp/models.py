@@ -64,3 +64,77 @@ class MemberReg(models.Model):
 
     def __str__(self):
         return f"{self.full_name} ({self.member_id})"
+
+class AssociativeWings(models.Model):
+    organization_name = models.CharField(max_length=255)
+    native_wing = models.CharField(max_length=255,blank=True, null=True)
+    short_description = models.TextField(blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+    contact_person_name = models.CharField(max_length=255,blank=True, null=True)
+    phone = models.CharField(max_length=15)
+    email = models.EmailField()
+    image = models.ImageField(upload_to='associative_wings/', blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.organization_name
+
+class Activity(models.Model):
+    activity_name = models.CharField(max_length=255)
+    activity_id = models.CharField( max_length=30,unique=True,editable=False)
+    objective = models.TextField()
+    activity_date_time = models.DateTimeField()
+    venue = models.CharField(max_length=255)
+    image = models.ImageField(upload_to='activities/', blank=True, null=True)
+    activity_fee = models.DecimalField(max_digits=10, decimal_places=2)
+    portal_charges = models.DecimalField(max_digits=10, decimal_places=2)
+    transaction_charges = models.DecimalField(max_digits=10, decimal_places=2)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.activity_id:
+            while True:
+                activity_id = generate_id("ACT")
+                if not Activity.objects.filter(activity_id=activity_id).exists():
+                    self.activity_id = activity_id
+                    break
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.activity_name} ({self.activity_id})"
+class Donation(models.Model):
+    STATUS_CHOICES = (
+        ("PENDING", "Pending"),
+        ("SUCCESS", "Success"),
+        ("FAILED", "Failed"),
+    )
+    donation_id = models.CharField(
+        max_length=30,
+        unique=True,
+        editable=False
+    )
+    activity_id = models.CharField(max_length=30)  # no FK (safe for payments)
+    full_name = models.CharField(max_length=255)
+    email = models.EmailField()
+    phone = models.CharField(max_length=15)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    purpose = models.CharField(max_length=255)
+    status = models.CharField( max_length=10,choices=STATUS_CHOICES,default="PENDING")
+    payment_reference = models.CharField(max_length=100, blank=True,null=True) 
+    created_at = models.DateTimeField(auto_now_add=True)
+    def save(self, *args, **kwargs):
+        if not self.donation_id:
+            while True:
+                donation_id = generate_id("DON")
+                if not Donation.objects.filter(donation_id=donation_id).exists():
+                    self.donation_id = donation_id
+                    break
+        super().save(*args, **kwargs)
+    def __str__(self):
+        return f"{self.full_name} - {self.amount} ({self.status})"
+
