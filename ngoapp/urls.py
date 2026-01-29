@@ -1,6 +1,6 @@
 from django.urls import path,include
 
-from .views import AboutUsItemAPIView, ActivityAPIView, AssociativeWingsAPIView, CarsouselItem1APIView, ContactUsAPIView, DistrictAdminAPIView, DonationAPIView, DonationSocietyAPIView, LoginAPIView, MemberRegAPIView, RefreshTokenAPIView
+from .views import AboutUsItemAPIView, ActivityAPIView, AssociativeWingsAPIView, CarsouselItem1APIView, ContactUsAPIView, DistrictAdminAPIView, DistrictMailAPIView, DonationAPIView, DonationSocietyAPIView, LoginAPIView, MemberRegAPIView, RefreshTokenAPIView
 urlpatterns = [
     path('login/',LoginAPIView.as_view(),name='login'),
     path('refresh-token/', RefreshTokenAPIView.as_view(),name="refresh-token"),
@@ -13,4 +13,5 @@ urlpatterns = [
     path('aboutus-item/',AboutUsItemAPIView.as_view(),name="aboutus-api"),
     path('contact-us/',ContactUsAPIView.as_view(),name='contact-us'),
     path('district-reg/',DistrictAdminAPIView.as_view(),name='district-admin'),
+    path('district-mail/',DistrictMailAPIView.as_view(),name='district-mail'),
 ]

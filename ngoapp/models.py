@@ -213,3 +213,13 @@ class DistrictAdmin(models.Model):
                     self.district_admin_id = district_admin_id
                     break
         super().save(*args, **kwargs)
+
+class DistrictMail(models.Model):
+    district_admin_id = models.ForeignKey(DistrictAdmin,on_delete=models.CASCADE,related_name="sent_mails",to_field='district_admin_id')
+    member_ids = models.JSONField(default=list, blank=True, null=True)
+    subject = models.CharField(max_length=255)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.subject} - {self.sender.district_admin_id}"

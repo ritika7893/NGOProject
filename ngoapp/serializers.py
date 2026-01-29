@@ -1,7 +1,7 @@
 from decimal import Decimal
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-from .models import AboutUsItem, Activity, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, Donation, DonationSociety, MemberReg, AllLog
+from .models import AboutUsItem, Activity, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, MemberReg, AllLog
  # adjust import path if needed
 from django.utils import timezone
 
@@ -192,3 +192,13 @@ class DistrictAdminSerializer(serializers.ModelSerializer):
             AllLog.objects.filter(unique_id=instance.district_admin_id).update(**filtered_changes)
 
         return instance
+class DistrictMailSerializer(serializers.ModelSerializer):
+    member_ids = serializers.ListField(
+        child=serializers.CharField(),
+        
+    )
+
+    class Meta:
+        model = DistrictMail
+        fields = "__all__"
+        read_only_fields = [ "created_at"]

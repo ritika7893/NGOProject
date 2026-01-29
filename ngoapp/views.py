@@ -1,10 +1,11 @@
+from django.conf import settings
 from django.shortcuts import render
 from decimal import Decimal
-
-from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DonationSerializer, DonationSocietySerializer, MemberRegSerializer
+from django.core.mail import send_mail
+from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DistrictMailSerializer, DonationSerializer, DonationSocietySerializer, MemberRegSerializer
 from django.db import IntegrityError
-from .models import AboutUsItem, Activity, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, Donation, DonationSociety, MemberReg
-from .permissions import  IsAdminOrDistrictAdminSelf, IsAdminOrSelfUser, IsAdminRole
+from .models import AboutUsItem, Activity, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, MemberReg
+from .permissions import  IsAdminOrDistrictAdminSelf, IsAdminOrSelfUser, IsAdminRole, IsDistrictAdmin
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -731,3 +732,67 @@ class DistrictAdminAPIView(APIView):
                 {"success": False, "message": "An error occurred", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+class DistrictMailAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated, IsDistrictAdmin]
+
+    def post(self, request):
+       
+        try:
+            district_admin = DistrictAdmin.objects.get(
+                district_admin_id=request.user.unique_id
+            )
+        except DistrictAdmin.DoesNotExist:
+            return Response(
+                {"success": False, "message": "District admin not found"},
+                status=403
+            )
+
+        serializer = DistrictMailSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                member_ids = serializer.validated_data["receiver_member_ids"]
+
+                members = MemberReg.objects.filter(
+                    member_id__in=member_ids,
+                    district=district_admin.allocated_district
+                )
+
+                if not members.exists():
+                    return Response(
+                        {"success": False, "message": "No valid members for your district"},
+                        status=400
+                    )
+                emails = members.values_list("email", flat=True)
+                send_mail(
+                    subject=serializer.validated_data["subject"],
+                    message=serializer.validated_data["message"],
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=list(emails),
+                    fail_silently=False,
+                )
+                DistrictMail.objects.create(
+                    district_admin_id=district_admin,
+                    subject=serializer.validated_data["subject"],
+                    message=serializer.validated_data["message"],
+                    member_ids=list(
+                        members.values_list("member_id", flat=True)
+                    )
+                )
+
+                return Response(
+                    {"success": True, "message": "Mail sent successfully"},
+                    status=201
+                )
+
+            except Exception as e:
+                return Response(
+                    {"success": False, "message": str(e)},
+                    status=500
+                )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )

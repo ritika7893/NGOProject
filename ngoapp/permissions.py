@@ -1,5 +1,5 @@
 from rest_framework import permissions
-from .models import AllLog
+from .models import AllLog, DistrictAdmin
 
 class IsAdminRole(permissions.BasePermission):
     """
@@ -65,3 +65,22 @@ class IsAdminOrSelfUser(permissions.BasePermission):
             return False
 
         return getattr(obj, field_name, None) == alllog_user.unique_id
+class IsDistrictAdmin(permissions.BasePermission):
+    """
+    Allows access only to DistrictAdmin users
+    """
+
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        # Role check
+        if user.role != "district-admin":
+            return False
+
+        # Ensure linked DistrictAdmin exists
+        return DistrictAdmin.objects.filter(
+            district_admin_id=user.unique_id
+        ).exists()
