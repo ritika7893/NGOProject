@@ -54,6 +54,8 @@ class MemberReg(models.Model):
     nature_of_work = models.TextField(blank=True, null=True)
     education_level = models.CharField(max_length=150, blank=True, null=True)
     other_text = models.TextField(blank=True, null=True)
+    district=models.CharField(max_length=200, blank=True, null=True)
+    state=models.CharField(max_length=200, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -109,9 +111,9 @@ class Activity(models.Model):
         return f"{self.activity_name} ({self.activity_id})"
 class Donation(models.Model):
     STATUS_CHOICES = (
-        ("PENDING", "Pending"),
-        ("SUCCESS", "Success"),
-        ("FAILED", "Failed"),
+        ("pending", "Pending"),
+        ("success", "Success"),
+        ("failed", "Failed"),
     )
     donation_id = models.CharField(
         max_length=30,
@@ -119,11 +121,11 @@ class Donation(models.Model):
         editable=False
     )
     activity_id = models.CharField(max_length=30)  # no FK (safe for payments)
-    full_name = models.CharField(max_length=255)
-    email = models.EmailField()
-    phone = models.CharField(max_length=15)
+    full_name = models.CharField(max_length=255, blank=True,null=True)
+    email = models.EmailField( blank=True,null=True)
+    phone = models.CharField(max_length=15, blank=True,null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    purpose = models.CharField(max_length=255)
+  
     status = models.CharField( max_length=10,choices=STATUS_CHOICES,default="PENDING")
     payment_reference = models.CharField(max_length=100, blank=True,null=True) 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -138,3 +140,56 @@ class Donation(models.Model):
     def __str__(self):
         return f"{self.full_name} - {self.amount} ({self.status})"
 
+class DonationSociety(models.Model):
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("success", "Success"),
+        ("failed", "Failed"),
+    )
+    donation_id = models.CharField( max_length=30,unique=True,
+        editable=False
+    )
+    purpose = models.CharField(max_length=255)
+    full_name = models.CharField(max_length=255, blank=True,null=True)
+    email = models.EmailField( blank=True,null=True)
+    phone = models.CharField(max_length=15, blank=True,null=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField( max_length=10,choices=STATUS_CHOICES,default="pending")
+    payment_reference = models.CharField(max_length=100, blank=True,null=True) 
+    created_at = models.DateTimeField(auto_now_add=True)
+    def save(self, *args, **kwargs):
+        if not self.donation_id:
+            while True:
+                donation_id = generate_id("DON")
+                if not Donation.objects.filter(donation_id=donation_id).exists():
+                    self.donation_id = donation_id
+                    break
+        super().save(*args, **kwargs)
+    def __str__(self):
+        return f"{self.full_name} - {self.amount} ({self.status})"
+    
+
+class CarsouselItem1(models.Model):
+    title=models.CharField(max_length=200)
+    sub_title=models.CharField(max_length=200,blank=True,null=True)
+    description=models.TextField(blank=True,null=True)
+    image=models.ImageField(upload_to="carousel_images/")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+class AboutUsItem(models.Model):
+    title=models.CharField(max_length=200)
+    description=models.TextField(blank=True,null=True)  
+    image=models.ImageField(upload_to="aboutus_images/")
+    module=models.JSONField(default=list, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+class ContactUs(models.Model):
+    full_name = models.CharField(max_length=100)
+    email = models.EmailField(blank=True, null=True)
+    mobile_number = models.CharField(max_length=15,blank=True, null=True)
+    message = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    def __str__(self):
+        return f"{self.full_name} - {self.subject}"

@@ -1,11 +1,15 @@
 from django.urls import path,include
 
-from .views import ActivityAPIView, AssociativeWingsAPIView, DonationAPIView, LoginAPIView, MemberRegAPIView, RefreshTokenAPIView
+from .views import AboutUsItemAPIView, ActivityAPIView, AssociativeWingsAPIView, CarsouselItem1APIView, ContactUsAPIView, DonationAPIView, DonationSocietyAPIView, LoginAPIView, MemberRegAPIView, RefreshTokenAPIView
 urlpatterns = [
     path('login/',LoginAPIView.as_view(),name='login'),
-    path("refresh-token/", RefreshTokenAPIView.as_view(),name="refresh-token"),
-    path("member-reg/", MemberRegAPIView.as_view(), name="member-list-create"),
-    path("associative-wings/", AssociativeWingsAPIView.as_view(), name="associative-wings"),
+    path('refresh-token/', RefreshTokenAPIView.as_view(),name="refresh-token"),
+    path('member-reg/', MemberRegAPIView.as_view(), name="member-list-create"),
+    path('associative-wings/', AssociativeWingsAPIView.as_view(), name="associative-wings"),
     path('activity-items/',ActivityAPIView.as_view(),name='activity-items'),
     path('donate/',DonationAPIView.as_view(),name='donate'),
+    path('donate-society/',DonationSocietyAPIView.as_view(),name='donate-society'),
+    path('carousel1-item/', CarsouselItem1APIView.as_view(), name="carousel-api"),
+    path('aboutus-item/',AboutUsItemAPIView.as_view(),name="aboutus-api"),
+    path('contact-us/',ContactUsAPIView.as_view(),name='contact-us'),
 ]

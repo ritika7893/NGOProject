@@ -1,8 +1,9 @@
 from django.shortcuts import render
+from decimal import Decimal
 
-from ngoapp.serializers import ActivitySerializer, AssociativeWingsSerializer, DonationSerializer, MemberRegSerializer
+from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DonationSerializer, DonationSocietySerializer, MemberRegSerializer
 
-from .models import Activity, AllLog, AssociativeWings, Donation, MemberReg
+from .models import AboutUsItem, Activity, AllLog, AssociativeWings, CarsouselItem1, ContactUs, Donation, DonationSociety, MemberReg
 from .permissions import IsAdminRole
 from django.shortcuts import render
 from rest_framework.views import APIView
@@ -395,3 +396,224 @@ class DonationAPIView(APIView):
             {"success": False, "errors": serializer.errors},
             status=400
         )
+    
+class DonationSocietyAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [AllowAny()]   # anyone can donate
+        return [IsAdminRole()]
+
+    def get(self, request):
+        donation_id = request.query_params.get("donation_id")
+
+        if donation_id:
+            donation = DonationSociety.objects.filter(
+                donation_id=donation_id
+            ).first()
+
+            if not donation:
+                return Response(
+                    {"success": False, "message": "Donation not found"},
+                    status=404
+                )
+
+            return Response(
+                {"success": True, "data": DonationSocietySerializer(donation).data},
+                status=200
+            )
+
+        donations = DonationSociety.objects.all().order_by("-created_at")
+
+        return Response(
+            {"success": True, "data": DonationSocietySerializer(donations, many=True).data},
+            status=200
+        )
+
+    def post(self, request):
+        serializer = DonationSocietySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(status="PENDING")
+            return Response(
+                {"success": True, "message": "Donation created successfully"},
+                status=201
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+class CarsouselItem1APIView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
+
+   
+    def get(self, request):
+       
+        carousel_id = request.query_params.get("id")
+
+        if carousel_id:
+            carousel = CarsouselItem1.objects.filter(id=carousel_id).first()
+            if not carousel:
+                return Response({"success": False, "message": "Not found"}, status=404)
+
+            return Response({"success": True, "data": CarsouselItem1Serializer(carousel).data})
+
+        
+        return Response({
+            "success": True,
+            "data": CarsouselItem1Serializer(
+                CarsouselItem1.objects.all(),
+                many=True
+            ).data
+        })
+
+   
+    def post(self, request):
+        serializer = CarsouselItem1Serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"success": True,"message": "Carousel item created successfully"}, status=201)
+
+        return Response({"success": False, "message": "Invalid data"}, status=400)
+
+  
+    def put(self, request):
+        carousel_id = request.data.get("id")
+        carousel = CarsouselItem1.objects.filter(id=carousel_id).first()
+
+        if not carousel:
+            return Response({"success": False, "message": "Carousel item not found"}, status=404)
+
+        serializer = CarsouselItem1Serializer(carousel, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"success": True,"message": "Carousel item updated successfully"})
+
+        return Response({"success": False}, status=400)
+
+
+    def delete(self, request):
+        carousel_id = request.data.get("id")
+        deleted, _ = CarsouselItem1.objects.filter(id=carousel_id).delete()
+
+        if not deleted:
+            return Response({"success": False, "message": "Carousel item not found"}, status=404)
+
+        return Response({"success": True, "message": "Carousel item deleted successfully"})
+class AboutUsItemAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
+
+
+    def get(self, request):
+       
+        about_id = request.query_params.get("id")
+
+        if about_id:
+            about = AboutUsItem.objects.filter(id=about_id).first()
+            if not about:
+                return Response(
+                    {"success": False, "message": "AboutUs not found"},
+                    status=404
+                )
+
+            return Response(
+                {"success": True, "data": AboutUsItemSerializer(about).data}
+            )
+
+       
+
+        about_list = AboutUsItem.objects.all().order_by("-created_at")
+        return Response(
+            {"success": True, "data": AboutUsItemSerializer(about_list, many=True).data}
+        )
+
+    def post(self, request):
+        serializer = AboutUsItemSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"success": True, "message": "AboutUs created successfully"},
+                status=201
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+
+    def put(self, request):
+        about_id = request.data.get("id")
+        if not about_id:
+            return Response(
+                {"success": False, "message": "id is required"},
+                status=400
+            )
+
+        about = AboutUsItem.objects.filter(id=about_id).first()
+        if not about:
+            return Response(
+                {"success": False, "message": "AboutUs not found"},
+                status=404
+            )
+
+        serializer = AboutUsItemSerializer(
+            about, data=request.data, partial=True
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"success": True, "message": "AboutUs updated successfully"}
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+
+    def delete(self, request):
+        about_id = request.data.get("id")
+        if not about_id:
+            return Response(
+                {"success": False, "message": "id is required"},
+                status=400
+            )
+
+        deleted, _ = AboutUsItem.objects.filter(id=about_id).delete()
+        if not deleted:
+            return Response(
+                {"success": False, "message": "AboutUs not found"},
+                status=404
+            )
+
+        return Response(
+            {"success": True, "message": "AboutUs deleted successfully"}
+        )
+
+
+class ContactUsAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [AllowAny()]
+        return [IsAdminRole()]
+    
+    def post(self, request):
+        serializer = ContactUsSerializer(data=request.data)
+        if serializer.is_valid():
+            contact = serializer.save()
+            return Response(
+                {"message": "Contact message submitted successfully!"},
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def get(self, request):
+        contacts = ContactUs.objects.all().order_by('-id')
+        serializer = ContactUsSerializer(contacts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
