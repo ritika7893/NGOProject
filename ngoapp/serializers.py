@@ -1,7 +1,7 @@
 from decimal import Decimal
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-from .models import AboutUsItem, Activity, AssociativeWings, CarsouselItem1, ContactUs, Donation, DonationSociety, MemberReg, AllLog
+from .models import AboutUsItem, Activity, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, Donation, DonationSociety, MemberReg, AllLog
  # adjust import path if needed
 from django.utils import timezone
 
@@ -133,3 +133,62 @@ class ContactUsSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactUs
         fields = "__all__"
+
+class DistrictAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DistrictAdmin
+        fields = "__all__"
+        extra_kwargs = {
+            "email": {"validators": []},
+            "phone": {"validators": []},
+            "password": {"write_only": True},
+        }
+
+    def create(self, validated_data):
+        raw_password = validated_data.pop("password", None)
+
+        if raw_password:
+            validated_data["password"] = make_password(raw_password)
+
+        district_admin = DistrictAdmin.objects.create(**validated_data)
+
+        # Create AllLog entry
+        AllLog.objects.create(
+            unique_id=district_admin.district_admin_id,  # or custom id if you have one
+            email=district_admin.email,
+            phone=district_admin.phone,
+            password=district_admin.password,
+            role="district-admin",
+            is_verified=True
+        )
+
+        return district_admin
+
+    def update(self, instance, validated_data):
+        # Track changes for DistrictAdmin
+        changes = {}
+
+        # Handle password separately
+        password = validated_data.pop("password", None)
+        if password:
+            hashed_password = make_password(password)
+            if instance.password != hashed_password:
+                instance.password = hashed_password
+                changes["password"] = hashed_password
+
+        # Update other fields in DistrictAdmin
+        for attr, value in validated_data.items():
+            if getattr(instance, attr) != value:
+                setattr(instance, attr, value)
+                changes[attr] = value
+
+        instance.save()
+
+        # Only update fields that exist in AllLog
+        alllog_fields = {f.name for f in AllLog._meta.get_fields()}
+        filtered_changes = {k: v for k, v in changes.items() if k in alllog_fields}
+
+        if filtered_changes:
+            AllLog.objects.filter(unique_id=instance.district_admin_id).update(**filtered_changes)
+
+        return instance

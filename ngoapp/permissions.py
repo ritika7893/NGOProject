@@ -18,3 +18,50 @@ class IsAdminRole(permissions.BasePermission):
             return alllog_user.role == "admin"
         except AllLog.DoesNotExist:
             return False
+
+class IsAdminOrDistrictAdminSelf(permissions.BasePermission):
+  
+
+    def has_permission(self, request, view):
+        # Allow access to authenticated users; object-level checked later
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        try:
+            alllog_user = AllLog.objects.get(unique_id=user.unique_id)
+        except AllLog.DoesNotExist:
+            return False
+
+        if alllog_user.role == "admin":
+            return True
+        return alllog_user.role == "district-admin" and obj.district_admin_id == alllog_user.unique_id
+
+
+class IsAdminOrSelfUser(permissions.BasePermission):
+  
+
+    def has_permission(self, request, view):
+        # Allow access to authenticated users; object-level checked later
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        try:
+            alllog_user = AllLog.objects.get(unique_id=user.unique_id)
+        except AllLog.DoesNotExist:
+            return False
+
+        if alllog_user.role == "admin":
+            return True
+
+        role_field_map = {
+            "district-admin": "district_admin_id",
+            "member": "member_id",
+        }
+
+        field_name = role_field_map.get(alllog_user.role)
+        if not field_name:
+            return False
+
+        return getattr(obj, field_name, None) == alllog_user.unique_id

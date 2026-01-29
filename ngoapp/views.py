@@ -1,10 +1,10 @@
 from django.shortcuts import render
 from decimal import Decimal
 
-from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DonationSerializer, DonationSocietySerializer, MemberRegSerializer
-
-from .models import AboutUsItem, Activity, AllLog, AssociativeWings, CarsouselItem1, ContactUs, Donation, DonationSociety, MemberReg
-from .permissions import IsAdminRole
+from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DonationSerializer, DonationSocietySerializer, MemberRegSerializer
+from django.db import IntegrityError
+from .models import AboutUsItem, Activity, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, Donation, DonationSociety, MemberReg
+from .permissions import  IsAdminOrDistrictAdminSelf, IsAdminOrSelfUser, IsAdminRole
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -98,14 +98,15 @@ class RefreshTokenAPIView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 class MemberRegAPIView(APIView):
-
+    authentication_classes = [JWTAuthentication]
     def get_permissions(self):
         if self.request.method == "GET":
-            return [IsAuthenticated()]
+            return [IsAuthenticated(), IsAdminOrSelfUser]  # unified class
         return [AllowAny()]
 
     def get(self, request):
         member_id = request.query_params.get("member_id")
+        district = request.query_params.get("district")  # new param
 
         if member_id:
             try:
@@ -118,8 +119,12 @@ class MemberRegAPIView(APIView):
                     status=404
                 )
 
-        members = MemberReg.objects.all().order_by("-created_at")
-        serializer = MemberRegSerializer(members, many=True)
+        # Filter by district if provided
+        queryset = MemberReg.objects.all().order_by("-created_at")
+        if district:
+            queryset = queryset.filter(district=district)  # assuming `district` is a field in MemberReg
+
+        serializer = MemberRegSerializer(queryset, many=True)
         return Response({"success": True, "data": serializer.data})
 
     def post(self, request):
@@ -617,3 +622,112 @@ class ContactUsAPIView(APIView):
         contacts = ContactUs.objects.all().order_by('-id')
         serializer = ContactUsSerializer(contacts, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class DistrictAdminAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def get_permissions(self):
+        if self.request.method in ("POST", "DELETE"):
+            return [IsAdminRole()]
+
+        if self.request.method in ("GET", "PUT"):
+            return [IsAuthenticated(), IsAdminOrDistrictAdminSelf()]
+
+        return [IsAuthenticated()]
+    from django.db import IntegrityError
+
+    def post(self, request):
+        serializer = DistrictAdminSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                serializer.save()
+                return Response(
+                    {"success": True, "message": "District admin created successfully"},
+                    status=201
+                )
+            except IntegrityError as e:
+                error_msg = str(e)
+
+                if "email" in error_msg:
+                    return Response(
+                        {"success": False, "message": "Email already exists"},
+                        status=400
+                    )
+                if "phone" in error_msg:
+                    return Response(
+                        {"success": False, "message": "Phone already exists"},
+                        status=400
+                    )
+
+                return Response(
+                    {"success": False, "message": "Duplicate entry"},
+                    status=400
+                )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+
+    def get(self, request):
+        district_admin_id = request.query_params.get("district_admin_id")
+
+        if district_admin_id:
+            admin = DistrictAdmin.objects.filter(
+                district_admin_id=district_admin_id
+            ).first()
+
+            if not admin:
+                return Response(
+                    {"success": False, "message": "District admin not found"},
+                    status=404
+                )
+
+            serializer = DistrictAdminSerializer(admin)
+            return Response(serializer.data)
+
+        queryset = DistrictAdmin.objects.all().order_by("-id")
+        serializer = DistrictAdminSerializer(queryset, many=True)
+        return Response(serializer.data)
+        
+    def put(self, request):
+        member_id = request.data.get("member_id")
+
+        if not member_id:
+            return Response(
+                {"success": False, "message": "member_id is required"},
+                status=400
+            )
+
+        try:
+            member = MemberReg.objects.get(member_id=member_id)
+        except MemberReg.DoesNotExist:
+            return Response(
+                {"success": False, "message": "Member not found"},
+                status=404
+            )
+
+        serializer = MemberRegSerializer(
+            member, data=request.data, partial=True
+        )
+
+        try:
+            if serializer.is_valid(raise_exception=True):
+                serializer.save()
+                return Response(
+                    {"success": True, "message": "Member updated successfully"}
+                )
+        except IntegrityError as e:
+            # Catch DB integrity errors like unique constraint violation
+            return Response(
+                {"success": False, "message": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            # Catch any other exceptions
+            return Response(
+                {"success": False, "message": "An error occurred", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

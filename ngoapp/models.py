@@ -193,3 +193,23 @@ class ContactUs(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         return f"{self.full_name} - {self.subject}"
+    
+class DistrictAdmin(models.Model):
+    district_admin_id=models.CharField(max_length=20,unique=True,editable=False)    
+    full_name=models.CharField(max_length=200,blank=True, null=True)
+    email=models.EmailField(unique=True,blank=True, null=True)
+    phone=models.CharField(max_length=15, unique=True,blank=True, null=True)
+    password=models.CharField(max_length=255,blank=True, null=True)
+    allocated_district=models.CharField(max_length=100,blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    def save(self, *args, **kwargs):
+        if not self.district_admin_id:
+            while True:
+                district_admin_id = generate_id("DIST/ADM")
+                if not DistrictAdmin.objects.filter(
+                    district_admin_id=district_admin_id
+                ).exists():
+                    self.district_admin_id = district_admin_id
+                    break
+        super().save(*args, **kwargs)
