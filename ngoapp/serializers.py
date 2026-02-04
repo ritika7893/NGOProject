@@ -1,7 +1,7 @@
 from decimal import Decimal
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-from .models import AboutUsItem, Activity, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, LatestUpdateItem, MemberReg, AllLog
+from .models import AboutUsItem, Activity, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, AllLog, RegionAdmin
  # adjust import path if needed
 from django.utils import timezone
 
@@ -211,9 +211,73 @@ class DistrictMailSerializer(serializers.ModelSerializer):
         model = DistrictMail
         fields = "__all__"
         read_only_fields = [ "created_at"]
-        
+
 class LatestUpdateItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = LatestUpdateItem
         fields = "__all__"
         read_only_fields = ["id", "created_at", "updated_at"]
+class RegionAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RegionAdmin
+        fields = "__all__"
+        extra_kwargs = {
+            "email": {"validators": []},
+            "phone": {"validators": []},
+            "password": {"write_only": True},
+        }
+
+    def create(self, validated_data):
+        raw_password = validated_data.pop("password", None)
+
+        if raw_password:
+            validated_data["password"] = make_password(raw_password)
+
+        region_admin = RegionAdmin.objects.create(**validated_data)
+
+        # Create AllLog entry
+        AllLog.objects.create(
+            unique_id=region_admin.region_admin_id,
+            email=region_admin.email,
+            phone=region_admin.phone,
+            password=region_admin.password,
+            role="region-admin",
+            is_verified=True
+        )
+
+        return region_admin
+
+    def update(self, instance, validated_data):
+        changes = {}
+
+        # Handle password
+        password = validated_data.pop("password", None)
+        if password:
+            hashed_password = make_password(password)
+            if instance.password != hashed_password:
+                instance.password = hashed_password
+                changes["password"] = hashed_password
+
+        # Update remaining fields
+        for attr, value in validated_data.items():
+            if getattr(instance, attr) != value:
+                setattr(instance, attr, value)
+                changes[attr] = value
+
+        instance.save()
+
+        # Sync with AllLog
+        alllog_fields = {f.name for f in AllLog._meta.get_fields()}
+        filtered_changes = {k: v for k, v in changes.items() if k in alllog_fields}
+
+        if filtered_changes:
+            AllLog.objects.filter(
+                unique_id=instance.region_admin_id
+            ).update(**filtered_changes)
+
+        return instance
+class FeedbackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Feedback
+        fields = "__all__"
+        read_only_fields = ["id", "created_at"]

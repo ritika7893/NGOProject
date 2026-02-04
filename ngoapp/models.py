@@ -235,3 +235,32 @@ class LatestUpdateItem(models.Model):
     link=models.CharField(max_length=300,blank=True,null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+class RegionAdmin(models.Model):
+    region_admin_id=models.CharField(max_length=20,unique=True,editable=False)    
+    full_name=models.CharField(max_length=200,blank=True, null=True)
+    email=models.EmailField(unique=True,blank=True, null=True)
+    phone=models.CharField(max_length=15, unique=True,blank=True, null=True)
+    password=models.CharField(max_length=255,blank=True, null=True)
+    allocated_district=models.JSONField(default=list, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    def save(self, *args, **kwargs):
+        if not self.region_admin_id:
+            while True:
+                region_admin_id = generate_id("REG/ADM")
+                if not RegionAdmin.objects.filter(
+                    region_admin_id=region_admin_id
+                ).exists():
+                    self.region_admin_id = region_admin_id
+                    break
+        super().save(*args, **kwargs)
+
+class Feedback(models.Model):
+    full_name = models.CharField(max_length=100)
+    email = models.EmailField(blank=True, null=True)
+    mobile_number = models.CharField(max_length=15,blank=True, null=True)
+    message = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    def __str__(self):
+        return f"{self.full_name} - {self.subject}"

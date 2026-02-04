@@ -1,12 +1,12 @@
 from django.conf import settings
 from django.shortcuts import render
 from decimal import Decimal
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view,permission_classes
 from django.core.mail import send_mail
-from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DistrictMailSerializer, DonationSerializer, DonationSocietySerializer, MemberRegSerializer
+from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DistrictMailSerializer, DonationSerializer, DonationSocietySerializer, FeedbackSerializer, LatestUpdateItemSerializer, MemberRegSerializer, RegionAdminSerializer
 from django.db import IntegrityError
-from .models import AboutUsItem, Activity, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, LatestUpdateItem, MemberReg
-from .permissions import  IsAdminOrDistrictAdminSelf, IsAdminOrSelfUser, IsAdminRole, IsDistrictAdmin
+from .models import AboutUsItem, Activity, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, RegionAdmin
+from .permissions import  IsAdminOrDistrictAdminSelf, IsAdminOrDistrictOrRegionAdmin, IsAdminOrRegionAdminSelf, IsAdminOrSelfUser, IsAdminRole, IsDistrictAdmin
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -72,6 +72,14 @@ class LoginAPIView(APIView):
                     )
                     response_data["allocated_district"] = district_admin.allocated_district
                 except DistrictAdmin.DoesNotExist:
+                    response_data["allocated_district"] = None
+            if user.role == "region-admin":
+                try:
+                    region_admin = RegionAdmin.objects.get(
+                        region_admin_id=user.unique_id
+                    )
+                    response_data["allocated_district"] = region_admin.allocated_district
+                except RegionAdmin.DoesNotExist:
                     response_data["allocated_district"] = None
 
             return Response(response_data, status=status.HTTP_200_OK)
@@ -731,13 +739,13 @@ class DistrictAdminAPIView(APIView):
                     {"success": True, "message": "Member updated successfully"}
                 )
         except IntegrityError as e:
-            # Catch DB integrity errors like unique constraint violation
+            
             return Response(
                 {"success": False, "message": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
-            # Catch any other exceptions
+           
             return Response(
                 {"success": False, "message": "An error occurred", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -827,17 +835,18 @@ class LatestUpdateItemAPIView(APIView):
                     status=404
                 )
 
+            serializer = LatestUpdateItemSerializer(item)
             return Response({
                 "success": True,
-                "data": LatestUpdateItemSerializer(item).data
+                "data": serializer.data
             })
+
+        latest_updates = LatestUpdateItem.objects.all().order_by("-created_at")
+        serializer = LatestUpdateItemSerializer(latest_updates, many=True)
 
         return Response({
             "success": True,
-            "data": LatestUpdateItemSerializer(
-                LatestUpdateItem.objects.all(),
-                many=True
-            ).data
+            "data": serializer.data
         })
 
     def post(self, request):
@@ -886,3 +895,160 @@ class LatestUpdateItemAPIView(APIView):
         return Response(
             {"success": True, "message": "Latest update deleted successfully"}
         )
+class RegionAdminAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def get_permissions(self):
+        if self.request.method in ("POST", "DELETE"):
+            return [IsAdminRole()]
+
+        if self.request.method in ("GET", "PUT"):
+            return [IsAuthenticated(), IsAdminOrRegionAdminSelf()]
+
+        return [IsAuthenticated()]
+
+    def post(self, request):
+        serializer = RegionAdminSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                serializer.save()
+                return Response(
+                    {"success": True, "message": "Region admin created successfully"},
+                    status=201
+                )
+            except IntegrityError as e:
+                error_msg = str(e)
+
+                if "email" in error_msg:
+                    return Response(
+                        {"success": False, "message": "Email already exists"},
+                        status=400
+                    )
+                if "phone" in error_msg:
+                    return Response(
+                        {"success": False, "message": "Phone already exists"},
+                        status=400
+                    )
+
+                return Response(
+                    {"success": False, "message": "Duplicate entry"},
+                    status=400
+                )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+
+    def get(self, request):
+        region_admin_id = request.query_params.get("region_admin_id")
+
+        if region_admin_id:
+            admin = RegionAdmin.objects.filter(
+                region_admin_id=region_admin_id
+            ).first()
+
+            if not admin:
+                return Response(
+                    {"success": False, "message": "Region admin not found"},
+                    status=404
+                )
+
+            serializer = RegionAdminSerializer(admin)
+            return Response(serializer.data)
+
+        queryset = RegionAdmin.objects.all().order_by("-id")
+        serializer = RegionAdminSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def put(self, request):
+        region_admin_id = request.data.get("region_admin_id")
+
+        if not region_admin_id:
+            return Response(
+                {"success": False, "message": "region_admin_id is required"},
+                status=400
+            )
+
+        admin = RegionAdmin.objects.filter(
+            region_admin_id=region_admin_id
+        ).first()
+
+        if not admin:
+            return Response(
+                {"success": False, "message": "Region admin not found"},
+                status=404
+            )
+
+        serializer = RegionAdminSerializer(
+            admin, data=request.data, partial=True
+        )
+
+        try:
+            if serializer.is_valid(raise_exception=True):
+                serializer.save()
+                return Response(
+                    {"success": True, "message": "Region admin updated successfully"}
+                )
+        except IntegrityError as e:
+            return Response(
+                {"success": False, "message": str(e)},
+                status=400
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "success": False,
+                    "message": "An error occurred",
+                    "details": str(e)
+                },
+                status=500
+            )
+class FeedbackAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [AllowAny()]
+        return [IsAdminRole()]
+
+    def post(self, request):
+        serializer = FeedbackSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "Feedback submitted successfully!"},
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    def get(self, request):
+        feedbacks = Feedback.objects.all().order_by("-id")
+        serializer = FeedbackSerializer(feedbacks, many=True)
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK
+        )
+@api_view(['GET'])
+@permission_classes([IsAdminOrDistrictOrRegionAdmin])
+def member_list_by_district(request):
+    districts = request.query_params.getlist('district')
+
+    if len(districts) == 1 and ',' in districts[0]:
+        districts = districts[0].split(',')
+
+    if not districts:
+        return Response(
+            {"error": "District parameter is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    members = MemberReg.objects.filter(district__in=districts)
+    serializer = MemberRegSerializer(members, many=True)
+
+    return Response(serializer.data, status=status.HTTP_200_OK)

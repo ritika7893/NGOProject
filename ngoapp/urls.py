@@ -1,6 +1,6 @@
 from django.urls import path,include
 
-from .views import AboutUsItemAPIView, ActivityAPIView, AssociativeWingsAPIView, CarsouselItem1APIView, ContactUsAPIView, DistrictAdminAPIView, DistrictMailAPIView, DonationAPIView, DonationSocietyAPIView, LoginAPIView, MemberRegAPIView, RefreshTokenAPIView, associative_wing_name_list
+from .views import AboutUsItemAPIView, ActivityAPIView, AssociativeWingsAPIView, CarsouselItem1APIView, ContactUsAPIView, DistrictAdminAPIView, DistrictMailAPIView, DonationAPIView, DonationSocietyAPIView, FeedbackAPIView, LatestUpdateItemAPIView, LoginAPIView, MemberRegAPIView, RefreshTokenAPIView, RegionAdminAPIView, associative_wing_name_list, member_list_by_district
 urlpatterns = [
     path('login/',LoginAPIView.as_view(),name='login'),
     path('refresh-token/', RefreshTokenAPIView.as_view(),name="refresh-token"),
@@ -15,4 +15,9 @@ urlpatterns = [
     path('district-reg/',DistrictAdminAPIView.as_view(),name='district-admin'),
     path('district-mail/',DistrictMailAPIView.as_view(),name='district-mail'),
     path('associative-wing-names/',associative_wing_name_list,name='associative-wing-names'),
-]
+    path("latest-update-items/", LatestUpdateItemAPIView.as_view(), name="latest-update-items"),
+    path("region-reg/", RegionAdminAPIView.as_view(), name="region-admin"),
+    path("feedback/", FeedbackAPIView.as_view(),name="feedback"),
+    path('get-member-by-district/', member_list_by_district, name='get-member-by-district'),
+
+]    
