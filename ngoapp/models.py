@@ -133,7 +133,7 @@ class Donation(models.Model):
     phone = models.CharField(max_length=15, blank=True,null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
   
-    status = models.CharField( max_length=10,choices=STATUS_CHOICES,default="PENDING")
+    status = models.CharField( max_length=10,choices=STATUS_CHOICES,default="pending")
     payment_reference = models.CharField(max_length=100, blank=True,null=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     def save(self, *args, **kwargs):
@@ -230,6 +230,7 @@ class DistrictMail(models.Model):
 
     def __str__(self):
         return f"{self.subject} - {self.sender.district_admin_id}"
+    
 class LatestUpdateItem(models.Model):
     title=models.CharField(max_length=200)
     link=models.CharField(max_length=300,blank=True,null=True)
@@ -261,6 +262,18 @@ class Feedback(models.Model):
     email = models.EmailField(blank=True, null=True)
     mobile_number = models.CharField(max_length=15,blank=True, null=True)
     message = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=50, default="pending")
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         return f"{self.full_name} - {self.subject}"
+
+
+class AdminMail(models.Model):
+    admin_id = models.ForeignKey(AllLog,on_delete=models.CASCADE,related_name="sent_mails",to_field='unique_id')
+    member_ids = models.JSONField(default=list, blank=True, null=True)
+    subject = models.CharField(max_length=255)
+    message = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.subject} - {self.admin_id}"

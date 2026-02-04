@@ -1011,6 +1011,8 @@ class FeedbackAPIView(APIView):
     def get_permissions(self):
         if self.request.method == "POST":
             return [AllowAny()]
+        if self.request.method == "DELETE":
+            return [IsAdminRole()]
         return [IsAdminRole()]
 
     def post(self, request):
@@ -1032,6 +1034,55 @@ class FeedbackAPIView(APIView):
         serializer = FeedbackSerializer(feedbacks, many=True)
         return Response(
             serializer.data,
+            status=status.HTTP_200_OK
+        )
+    def delete(self, request):
+        feedback_id = request.data.get("id")
+
+        if not feedback_id:
+            return Response(
+                {"success": False, "message": "Feedback id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        deleted, _ = Feedback.objects.filter(id=feedback_id).delete()
+
+        if not deleted:
+            return Response(
+                {"success": False, "message": "Feedback not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(
+            {"success": True, "message": "Feedback deleted successfully"},
+            status=status.HTTP_200_OK
+        )
+    def put(self, request):
+        feedback_id = request.data.get("id")
+        status_value = request.data.get("status")
+
+        if not feedback_id:
+            return Response(
+                {"success": False, "message": "Feedback id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if status_value is None:
+            return Response(
+                {"success": False, "message": "Status is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        updated = Feedback.objects.filter(id=feedback_id).update(status=status_value)
+
+        if not updated:
+            return Response(
+                {"success": False, "message": "Feedback not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(
+            {"success": True, "message": "Feedback status updated successfully"},
             status=status.HTTP_200_OK
         )
 @api_view(['GET'])
