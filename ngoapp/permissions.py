@@ -21,10 +21,27 @@ class IsAdminRole(permissions.BasePermission):
 
 class IsAdminOrDistrictAdminSelf(permissions.BasePermission):
   
-
     def has_permission(self, request, view):
-        # Allow access to authenticated users; object-level checked later
-        return request.user and request.user.is_authenticated
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        try:
+            alllog_user = AllLog.objects.get(unique_id=user.unique_id)
+        except AllLog.DoesNotExist:
+            return False
+
+        if alllog_user.role == "admin":
+            return True
+
+        if alllog_user.role == "district-admin":
+            return DistrictAdmin.objects.filter(
+                district_admin_id=alllog_user.unique_id
+            ).exists()
+
+    
+        return False
 
     def has_object_permission(self, request, view, obj):
         user = request.user

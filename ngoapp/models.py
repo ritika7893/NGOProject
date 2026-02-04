@@ -54,6 +54,10 @@ class MemberReg(models.Model):
     nature_of_work = models.TextField(blank=True, null=True)
     education_level = models.CharField(max_length=150, blank=True, null=True)
     other_text = models.TextField(blank=True, null=True)
+    gender = models.CharField(max_length=50, blank=True, null=True)
+    date_of_birth = models.DateField(blank=True, null=True)
+    registration_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    primary_membership=models.CharField(max_length=100, blank=True, null=True)
     district=models.CharField(max_length=200, blank=True, null=True)
     state=models.CharField(max_length=200, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -76,7 +80,7 @@ class AssociativeWings(models.Model):
     phone = models.CharField(max_length=15)
     email = models.EmailField()
     image = models.ImageField(upload_to='associative_wings/', blank=True, null=True)
-
+   
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -86,15 +90,18 @@ class AssociativeWings(models.Model):
 class Activity(models.Model):
     activity_name = models.CharField(max_length=255)
     activity_id = models.CharField( max_length=30,unique=True,editable=False)
-    objective = models.TextField()
-    activity_date_time = models.DateTimeField()
-    venue = models.CharField(max_length=255)
+    objective = models.TextField(blank=True, null=True)
+    activity_date_time = models.DateTimeField(blank=True, null=True)
+    district=models.CharField(max_length=100,blank=True, null=True)
+    venue = models.CharField(max_length=255,blank=True, null=True)
     image = models.ImageField(upload_to='activities/', blank=True, null=True)
-    activity_fee = models.DecimalField(max_digits=10, decimal_places=2)
-    portal_charges = models.DecimalField(max_digits=10, decimal_places=2)
-    transaction_charges = models.DecimalField(max_digits=10, decimal_places=2)
-    tax_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    activity_fee = models.DecimalField(max_digits=10, decimal_places=2,blank=True, null=True)
+    portal_charges = models.DecimalField(max_digits=10, decimal_places=2,blank=True, null=True)
+    transaction_charges = models.DecimalField(max_digits=10, decimal_places=2,blank=True, null=True)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2,blank=True, null=True)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2,blank=True, null=True)
+    created_by = models.CharField(max_length=30, blank=True, null=True)
+    updated_by = models.CharField(max_length=30, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -223,3 +230,8 @@ class DistrictMail(models.Model):
 
     def __str__(self):
         return f"{self.subject} - {self.sender.district_admin_id}"
+class LatestUpdateItem(models.Model):
+    title=models.CharField(max_length=200)
+    link=models.CharField(max_length=300,blank=True,null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

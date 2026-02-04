@@ -1,10 +1,11 @@
 from django.conf import settings
 from django.shortcuts import render
 from decimal import Decimal
+from rest_framework.decorators import api_view
 from django.core.mail import send_mail
 from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DistrictMailSerializer, DonationSerializer, DonationSocietySerializer, MemberRegSerializer
 from django.db import IntegrityError
-from .models import AboutUsItem, Activity, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, MemberReg
+from .models import AboutUsItem, Activity, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, LatestUpdateItem, MemberReg
 from .permissions import  IsAdminOrDistrictAdminSelf, IsAdminOrSelfUser, IsAdminRole, IsDistrictAdmin
 from django.shortcuts import render
 from rest_framework.views import APIView
@@ -55,16 +56,25 @@ class LoginAPIView(APIView):
             refresh["unique_id"] = user.unique_id
             refresh["role"] = user.role
 
-            return Response(
-                {
-                    "message": "Login successful",
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh),
-                    "unique_id": user.unique_id,
-                    "role": user.role,
-                },
-                status=status.HTTP_200_OK
-            )
+            response_data = {
+                "message": "Login successful",
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "unique_id": user.unique_id,
+                "role": user.role,
+            }
+
+           
+            if user.role == "district-admin":
+                try:
+                    district_admin = DistrictAdmin.objects.get(
+                        district_admin_id=user.unique_id
+                    )
+                    response_data["allocated_district"] = district_admin.allocated_district
+                except DistrictAdmin.DoesNotExist:
+                    response_data["allocated_district"] = None
+
+            return Response(response_data, status=status.HTTP_200_OK)
 
         except AllLog.DoesNotExist:
             return Response(
@@ -102,12 +112,12 @@ class MemberRegAPIView(APIView):
     authentication_classes = [JWTAuthentication]
     def get_permissions(self):
         if self.request.method == "GET":
-            return [IsAuthenticated(), IsAdminOrSelfUser]  # unified class
+            return [AllowAny()]  # unified class
         return [AllowAny()]
 
     def get(self, request):
         member_id = request.query_params.get("member_id")
-        district = request.query_params.get("district")  # new param
+        district = request.query_params.get("allocated_district")  # new param
 
         if member_id:
             try:
@@ -271,7 +281,7 @@ class ActivityAPIView(APIView):
     authentication_classes = [JWTAuthentication]
 
     def get_permissions(self):
-        return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
+        return [AllowAny()] if self.request.method == "GET" else [IsAdminOrDistrictAdminSelf()]
 
     def get(self, request):
         activity_id = request.query_params.get("activity_id")
@@ -294,7 +304,7 @@ class ActivityAPIView(APIView):
         )
 
     def post(self, request):
-        serializer = ActivitySerializer(data=request.data)
+        serializer = ActivitySerializer(data=request.data,context={"request": request})
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -322,7 +332,7 @@ class ActivityAPIView(APIView):
                 status=404
             )
 
-        serializer = ActivitySerializer(activity, data=request.data, partial=True)
+        serializer = ActivitySerializer(activity, data=request.data, partial=True,context={"request": request})
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -752,7 +762,7 @@ class DistrictMailAPIView(APIView):
 
         if serializer.is_valid():
             try:
-                member_ids = serializer.validated_data["receiver_member_ids"]
+                member_ids = serializer.validated_data["member_ids"]
 
                 members = MemberReg.objects.filter(
                     member_id__in=member_ids,
@@ -795,4 +805,84 @@ class DistrictMailAPIView(APIView):
         return Response(
             {"success": False, "errors": serializer.errors},
             status=400
+        )
+@api_view(['GET'])
+def associative_wing_name_list(request):
+    names = AssociativeWings.objects.values_list('organization_name', flat=True)
+    return Response(names)
+class LatestUpdateItemAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
+
+    def get(self, request):
+        item_id = request.query_params.get("id")
+
+        if item_id:
+            item = LatestUpdateItem.objects.filter(id=item_id).first()
+            if not item:
+                return Response(
+                    {"success": False, "message": "Not found"},
+                    status=404
+                )
+
+            return Response({
+                "success": True,
+                "data": LatestUpdateItemSerializer(item).data
+            })
+
+        return Response({
+            "success": True,
+            "data": LatestUpdateItemSerializer(
+                LatestUpdateItem.objects.all(),
+                many=True
+            ).data
+        })
+
+    def post(self, request):
+        serializer = LatestUpdateItemSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"success": True, "message": "Latest update created successfully"},
+                status=201
+            )
+
+        return Response(
+            {"success": False, "message": "Invalid data"},
+            status=400
+        )
+
+    def put(self, request):
+        item_id = request.data.get("id")
+        item = LatestUpdateItem.objects.filter(id=item_id).first()
+
+        if not item:
+            return Response(
+                {"success": False, "message": "Latest update not found"},
+                status=404
+            )
+
+        serializer = LatestUpdateItemSerializer(item, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"success": True, "message": "Latest update updated successfully"}
+            )
+
+        return Response({"success": False}, status=400)
+
+    def delete(self, request):
+        item_id = request.data.get("id")
+        deleted, _ = LatestUpdateItem.objects.filter(id=item_id).delete()
+
+        if not deleted:
+            return Response(
+                {"success": False, "message": "Latest update not found"},
+                status=404
+            )
+
+        return Response(
+            {"success": True, "message": "Latest update deleted successfully"}
         )

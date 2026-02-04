@@ -1,7 +1,7 @@
 from decimal import Decimal
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-from .models import AboutUsItem, Activity, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, MemberReg, AllLog
+from .models import AboutUsItem, Activity, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, LatestUpdateItem, MemberReg, AllLog
  # adjust import path if needed
 from django.utils import timezone
 
@@ -79,15 +79,24 @@ class ActivitySerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
+        request = self.context.get("request")
         activity_fee = validated_data.get("activity_fee", Decimal("0.00"))
         validated_data.update(self.calculate_amounts(activity_fee))
+
+        if request and request.user:
+            validated_data["created_by"] = request.user.unique_id
+            validated_data["updated_by"] = request.user.unique_id
+
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        activity_fee = validated_data.get(
-            "activity_fee", instance.activity_fee
-        )
+        request = self.context.get("request")
+        activity_fee = validated_data.get("activity_fee", instance.activity_fee)
         validated_data.update(self.calculate_amounts(activity_fee))
+
+        if request and request.user:
+            validated_data["updated_by"] = request.user.unique_id
+
         return super().update(instance, validated_data)
     def get_is_past(self, obj):
         if not obj.activity_date_time:
@@ -202,3 +211,9 @@ class DistrictMailSerializer(serializers.ModelSerializer):
         model = DistrictMail
         fields = "__all__"
         read_only_fields = [ "created_at"]
+        
+class LatestUpdateItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LatestUpdateItem
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "updated_at"]
