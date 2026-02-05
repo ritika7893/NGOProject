@@ -289,34 +289,36 @@ class RegionMail(models.Model):
     def __str__(self):
         return f"{self.subject} - {self.region_admin_id}"
 
-class ProblemSolving(models.Model):
+class ProblemReport(models.Model):
 
     STATUS_CHOICES = (
         ("pending", "Pending"),
         ("in_progress", "In Progress"),
         ("solved", "Solved"),
     )
-    full_name = models.CharField(max_length=255, blank=True, null=True)
-    problem_nature = models.CharField(max_length=255, blank=True, null=True)
-    department = models.CharField(max_length=255, blank=True, null=True)
-    description = models.TextField( blank=True, null=True)
 
-    district = models.CharField(max_length=100, blank=True, null=True)
+    problem_nature = models.CharField(max_length=255)
+    department = models.CharField(max_length=255)
+    description = models.TextField()
+    district = models.CharField(max_length=100)
+
     status = models.CharField(max_length=20,choices=STATUS_CHOICES,default="pending")
 
     remark = models.TextField(blank=True, null=True)
 
-    action_taken_by = models.ForeignKey(
-        AllLog,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="problem_actions",
-        to_field="unique_id"
-    )
+    action_taken_by = models.ForeignKey( AllLog, on_delete=models.SET_NULL,null=True,blank=True, to_field="unique_id")
+    solved_at = models.DateTimeField(blank=True,null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    def save(self, *args, **kwargs):
+        if self.status == "solved" and self.solved_at is None:
+            self.solved_at = timezone.now()
 
+        # Optional: clear solved date if reopened
+        if self.status != "solved":
+            self.solved_at = None
+
+        super().save(*args, **kwargs)
     def __str__(self):
         return f"{self.problem_nature} - {self.status}"

@@ -1,6 +1,6 @@
 from django.urls import path,include
 
-from .views import AboutUsItemAPIView, ActivityAPIView, AdminMailAPIView, AssociativeWingsAPIView, CarsouselItem1APIView, ContactUsAPIView, DistrictAdminAPIView, DistrictMailAPIView, DonationAPIView, DonationSocietyAPIView, FeedbackAPIView, LatestUpdateItemAPIView, LoginAPIView, MemberRegAPIView, RefreshTokenAPIView, RegionAdminAPIView, RegionMailAPIView, associative_wing_name_list, member_list_by_district
+from .views import AboutUsItemAPIView, ActivityAPIView, AdminMailAPIView, AssociativeWingsAPIView, CarsouselItem1APIView, ContactUsAPIView, DistrictAdminAPIView, DistrictMailAPIView, DonationAPIView, DonationSocietyAPIView, FeedbackAPIView, LatestUpdateItemAPIView, LoginAPIView, MemberRegAPIView, ProblemReportAPIView, RefreshTokenAPIView, RegionAdminAPIView, RegionMailAPIView, associative_wing_name_list, member_list_by_district
 urlpatterns = [
     path('login/',LoginAPIView.as_view(),name='login'),
     path('refresh-token/', RefreshTokenAPIView.as_view(),name="refresh-token"),
@@ -21,5 +21,6 @@ urlpatterns = [
     path('get-member-by-district/', member_list_by_district, name='get-member-by-district'),
     path('admin-mail/',AdminMailAPIView.as_view(),name="admin-mail"),
     path('region-mail/',RegionMailAPIView.as_view(),name="region-mail"),
+    path('report-problem/', ProblemReportAPIView.as_view(), name='report-problem'),
 
 ]    

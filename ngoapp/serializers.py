@@ -1,7 +1,7 @@
 from decimal import Decimal
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-from .models import AboutUsItem, Activity, AdminMail, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, AllLog, RegionAdmin, RegionMail
+from .models import AboutUsItem, Activity, AdminMail, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, AllLog, ProblemReport, RegionAdmin, RegionMail
  # adjust import path if needed
 from django.utils import timezone
 from django.db import transaction,IntegrityError
@@ -327,10 +327,15 @@ class RegionMailSerializer(serializers.ModelSerializer):
         model = RegionMail
         fields = ["member_ids", "subject", "message"] 
 
+class ProblemReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProblemReport
+        fields = "__all__"
+        read_only_fields = ["solved_at"]
     def validate(self, data):
         request = self.context.get("request")
 
-     
+        # Public POST
         if request and request.method == "POST":
             return data
 
@@ -342,9 +347,6 @@ class RegionMailSerializer(serializers.ModelSerializer):
                 {"remark": "Remark is required when problem is solved"}
             )
 
-        if status == "in_progress" and remark:
-            raise serializers.ValidationError(
-                {"remark": "Remark is not allowed for in-progress status"}
-            )
+        
 
         return data

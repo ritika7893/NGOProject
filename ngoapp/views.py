@@ -1,11 +1,12 @@
+from urllib import request
 from django.conf import settings
 from django.shortcuts import render
 from decimal import Decimal
 from rest_framework.decorators import api_view,permission_classes
 from django.core.mail import send_mail
-from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AdminMailSerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DistrictMailSerializer, DonationSerializer, DonationSocietySerializer, FeedbackSerializer, LatestUpdateItemSerializer, MemberRegSerializer, RegionAdminSerializer, RegionMailSerializer
+from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AdminMailSerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DistrictMailSerializer, DonationSerializer, DonationSocietySerializer, FeedbackSerializer, LatestUpdateItemSerializer, MemberRegSerializer, ProblemReportSerializer, RegionAdminSerializer, RegionMailSerializer
 from django.db import IntegrityError
-from .models import AboutUsItem, Activity, AdminMail, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, RegionAdmin, RegionMail
+from .models import AboutUsItem, Activity, AdminMail, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, ProblemReport, RegionAdmin, RegionMail
 from .permissions import  IsAdminOrDistrictAdminSelf, IsAdminOrDistrictOrRegionAdmin, IsAdminOrRegionAdminSelf, IsAdminOrSelfUser, IsAdminRole, IsDistrictAdmin, IsRegionAdmin
 from django.shortcuts import render
 from rest_framework.views import APIView
@@ -752,8 +753,26 @@ class DistrictAdminAPIView(APIView):
             )
 class DistrictMailAPIView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated, IsDistrictAdmin]
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated(), IsDistrictAdmin()]
 
+        if self.request.method == "GET":
+            return [IsAuthenticated(), IsAdminRole()]
+
+        return [IsAuthenticated()]
+    def get(self, request):
+        mails = DistrictMail.objects.all().order_by("-created_at")
+        serializer = DistrictMailSerializer(mails, many=True)
+
+        return Response(
+            {
+                "success": True,
+                "count": mails.count(),
+                "data": serializer.data
+            },
+            status=200
+        )
     def post(self, request):
        
         try:
@@ -1171,10 +1190,30 @@ class AdminMailAPIView(APIView):
             {"success": False, "errors": serializer.errors},
             status=400
         )
+    def get(self, request):
+        mails = AdminMail.objects.all().order_by("-created_at")
+        serializer = AdminMailSerializer(mails, many=True)
+
+        return Response(
+            {
+                "success": True,
+                "count": mails.count(),
+                "data": serializer.data
+            },
+            status=200
+        )
 class RegionMailAPIView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated,  IsRegionAdmin]
+    
 
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated(), IsRegionAdmin()]
+
+        if self.request.method == "GET":
+            return [IsAuthenticated(), IsAdminRole()]
+
+        return [IsAuthenticated()]
     def post(self, request):
         try:
             region_admin = AllLog.objects.get(
@@ -1236,3 +1275,184 @@ class RegionMailAPIView(APIView):
                 {"success": False, "message": str(e)},
                 status=500
             )
+    def get(self, request):
+        mails = RegionMail.objects.all().order_by("-created_at")
+        serializer = RegionMailSerializer(mails, many=True)
+
+        return Response(
+            {
+                "success": True,
+                "count": mails.count(),
+                "data": serializer.data
+            },
+            status=200
+        )
+class ProblemReportAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]  
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [AllowAny()]
+        if self.request.method == "DELETE":
+            return [IsAdminRole()]
+        return super().get_permissions()
+    def post(self, request):
+        serializer = ProblemReportSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"success": True, "message": "Problem submitted successfully"},
+                status=201
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+
+  
+    def get(self, request):
+        if not request.user or not request.user.is_authenticated:
+            return Response(
+                {"success": False, "message": "Authentication required"},
+                status=401
+            )
+
+        user = AllLog.objects.get(unique_id=request.user.unique_id)
+
+        # ✅ Admin: sees everything
+        if user.role == "admin":
+            queryset = ProblemReport.objects.all()
+
+        # ✅ Region Admin: allocated_district is a LIST (JSONField)
+        elif user.role == "region-admin":
+            region_admin = RegionAdmin.objects.filter(
+                region_admin_id=user.unique_id
+            ).first()
+
+            if not region_admin or not region_admin.allocated_district:
+                return Response(
+                    {"success": True, "data": []}
+                )
+
+            queryset = ProblemReport.objects.filter(
+                district__in=region_admin.allocated_district
+            )
+
+        # ✅ District Admin: allocated_district is a STRING
+        elif user.role == "district-admin":
+            district_admin = DistrictAdmin.objects.filter(
+                district_admin_id=user.unique_id
+            ).first()
+
+            if not district_admin or not district_admin.allocated_district:
+                return Response(
+                    {"success": True, "data": []}
+                )
+
+            queryset = ProblemReport.objects.filter(
+                district=district_admin.allocated_district
+            )
+
+        else:
+            return Response(
+                {"success": False, "message": "Access denied"},
+                status=403
+            )
+
+        serializer = ProblemReportSerializer(queryset, many=True)
+        return Response({"success": True, "data": serializer.data})
+    def put(self, request):
+        problem_id = request.data.get("id")
+        if not problem_id:
+            return Response(
+                {"success": False, "message": "id is required"},
+                status=400
+            )
+
+        problem = ProblemReport.objects.filter(id=problem_id).first()
+        if not problem:
+            return Response(
+                {"success": False, "message": "Problem not found"},
+                status=404
+            )
+
+        user = AllLog.objects.filter(unique_id=request.user.unique_id).first()
+        if not user:
+            return Response(
+                {"success": False, "message": "Invalid user"},
+                status=403
+            )
+
+        allowed = False
+
+        # ✅ Admin
+        if user.role == "admin":
+            allowed = True
+
+        # ✅ Region Admin (allocated_district is LIST)
+        elif user.role == "region-admin":
+            allowed = RegionAdmin.objects.filter(
+                region_admin_id=user.unique_id,
+                allocated_district__contains=[problem.district]
+            ).exists()
+
+        # ✅ District Admin (allocated_district is STRING)
+        elif user.role == "district-admin":
+            allowed = DistrictAdmin.objects.filter(
+                district_admin_id=user.unique_id,
+                allocated_district=problem.district
+            ).exists()
+
+        if not allowed:
+            return Response(
+                {"success": False, "message": "Permission denied"},
+                status=403
+            )
+
+        serializer = ProblemReportSerializer(
+            problem,
+            data=request.data,
+            partial=True,
+            context={"request": request}
+        )
+
+        if serializer.is_valid():
+            serializer.save(action_taken_by=user)
+            return Response(
+                {"success": True, "message": "Problem updated successfully"}
+            )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+    def delete(self, request):
+        problem_id = request.data.get("id")
+        if not problem_id:
+            return Response(
+                {"success": False, "message": "id is required"},
+                status=400
+            )
+
+        user = AllLog.objects.filter(unique_id=request.user.unique_id).first()
+        if not user or user.role != "admin":
+            return Response(
+                {"success": False, "message": "Only admin can delete"},
+                status=403
+            )
+
+        deleted, _ = ProblemReport.objects.filter(id=problem_id).delete()
+        if not deleted:
+            return Response(
+                {"success": False, "message": "Problem not found"},
+                status=404
+            )
+
+        return Response(
+            {"success": True, "message": "Problem deleted successfully"}
+        )
