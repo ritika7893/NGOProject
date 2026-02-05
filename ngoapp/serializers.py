@@ -1,10 +1,10 @@
 from decimal import Decimal
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-from .models import AboutUsItem, Activity, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, AllLog, RegionAdmin
+from .models import AboutUsItem, Activity, AdminMail, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, AllLog, RegionAdmin, RegionMail
  # adjust import path if needed
 from django.utils import timezone
-
+from django.db import transaction,IntegrityError
 class MemberRegSerializer(serializers.ModelSerializer):
     class Meta:
         model = MemberReg
@@ -159,19 +159,32 @@ class DistrictAdminSerializer(serializers.ModelSerializer):
         if raw_password:
             validated_data["password"] = make_password(raw_password)
 
-        district_admin = DistrictAdmin.objects.create(**validated_data)
+        # Pre-check (recommended)
+        if AllLog.objects.filter(email=validated_data.get("email")).exists():
+            raise serializers.ValidationError({"email": "Email already exists"})
 
-        # Create AllLog entry
-        AllLog.objects.create(
-            unique_id=district_admin.district_admin_id,  # or custom id if you have one
-            email=district_admin.email,
-            phone=district_admin.phone,
-            password=district_admin.password,
-            role="district-admin",
-            is_verified=True
+        if AllLog.objects.filter(phone=validated_data.get("phone")).exists():
+            raise serializers.ValidationError({"phone": "Phone already exists"})
+
+        try:
+            with transaction.atomic():
+                district_admin = DistrictAdmin.objects.create(**validated_data)
+
+                AllLog.objects.create(
+                    unique_id=district_admin.district_admin_id,
+                    email=district_admin.email,
+                    phone=district_admin.phone,
+                    password=district_admin.password,
+                    role="district-admin",
+                    is_verified=True
+                )
+
+                return district_admin
+
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {"message": "Email or phone already exists"}
         )
-
-        return district_admin
 
     def update(self, instance, validated_data):
         # Track changes for DistrictAdmin
@@ -233,19 +246,33 @@ class RegionAdminSerializer(serializers.ModelSerializer):
         if raw_password:
             validated_data["password"] = make_password(raw_password)
 
-        region_admin = RegionAdmin.objects.create(**validated_data)
+        # Optional but recommended: pre-check
+        if AllLog.objects.filter(email=validated_data.get("email")).exists():
+            raise serializers.ValidationError({"email": "Email already exists"})
 
-        # Create AllLog entry
-        AllLog.objects.create(
-            unique_id=region_admin.region_admin_id,
-            email=region_admin.email,
-            phone=region_admin.phone,
-            password=region_admin.password,
-            role="region-admin",
-            is_verified=True
-        )
+        if AllLog.objects.filter(phone=validated_data.get("phone")).exists():
+            raise serializers.ValidationError({"phone": "Phone already exists"})
 
-        return region_admin
+        try:
+            with transaction.atomic():
+                region_admin = RegionAdmin.objects.create(**validated_data)
+
+                AllLog.objects.create(
+                    unique_id=region_admin.region_admin_id,
+                    email=region_admin.email,
+                    phone=region_admin.phone,
+                    password=region_admin.password,
+                    role="region-admin",
+                    is_verified=True
+                )
+
+                return region_admin
+
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {"message": "Email or phone already exists"}
+            )
+
 
     def update(self, instance, validated_data):
         changes = {}
@@ -281,3 +308,43 @@ class FeedbackSerializer(serializers.ModelSerializer):
         model = Feedback
         fields = "__all__"
         read_only_fields = ["id", "created_at"]
+class AdminMailSerializer(serializers.ModelSerializer):
+    member_ids = serializers.ListField(
+        child=serializers.CharField()
+    )
+
+    class Meta:
+        model = AdminMail
+        fields = ["member_ids", "subject", "message"]
+
+class RegionMailSerializer(serializers.ModelSerializer):
+    member_ids = serializers.ListField(
+        child=serializers.CharField(),
+        write_only=True
+    )
+
+    class Meta:
+        model = RegionMail
+        fields = ["member_ids", "subject", "message"] 
+
+    def validate(self, data):
+        request = self.context.get("request")
+
+     
+        if request and request.method == "POST":
+            return data
+
+        status = data.get("status")
+        remark = data.get("remark")
+
+        if status == "solved" and not remark:
+            raise serializers.ValidationError(
+                {"remark": "Remark is required when problem is solved"}
+            )
+
+        if status == "in_progress" and remark:
+            raise serializers.ValidationError(
+                {"remark": "Remark is not allowed for in-progress status"}
+            )
+
+        return data

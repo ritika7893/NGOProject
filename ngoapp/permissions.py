@@ -185,3 +185,27 @@ class IsAdminOrDistrictOrRegionAdmin(permissions.BasePermission):
             return getattr(obj, "region_admin_id", None) == alllog_user.unique_id
 
         return False
+class IsRegionAdmin(permissions.BasePermission):
+    """
+    Allows access only to Region Admin users
+    """
+
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        try:
+            alllog_user = AllLog.objects.get(unique_id=user.unique_id)
+        except AllLog.DoesNotExist:
+            return False
+
+        # Role must be region-admin
+        if alllog_user.role != "region-admin":
+            return False
+
+        # Ensure linked RegionAdmin exists
+        return RegionAdmin.objects.filter(
+            region_admin_id=alllog_user.unique_id
+        ).exists()

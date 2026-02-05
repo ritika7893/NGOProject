@@ -269,7 +269,7 @@ class Feedback(models.Model):
 
 
 class AdminMail(models.Model):
-    admin_id = models.ForeignKey(AllLog,on_delete=models.CASCADE,related_name="sent_mails",to_field='unique_id')
+    admin_id = models.ForeignKey(AllLog,on_delete=models.CASCADE,related_name="admin_sent_mails",to_field='unique_id')
     member_ids = models.JSONField(default=list, blank=True, null=True)
     subject = models.CharField(max_length=255)
     message = models.TextField(blank=True, null=True)
@@ -277,3 +277,46 @@ class AdminMail(models.Model):
 
     def __str__(self):
         return f"{self.subject} - {self.admin_id}"
+    
+
+class RegionMail(models.Model):
+    region_admin_id = models.ForeignKey(AllLog,on_delete=models.CASCADE,related_name="region_sent_mails",to_field='unique_id')
+    member_ids = models.JSONField(default=list, blank=True, null=True)
+    subject = models.CharField(max_length=255)
+    message = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.subject} - {self.region_admin_id}"
+
+class ProblemSolving(models.Model):
+
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("in_progress", "In Progress"),
+        ("solved", "Solved"),
+    )
+    full_name = models.CharField(max_length=255, blank=True, null=True)
+    problem_nature = models.CharField(max_length=255, blank=True, null=True)
+    department = models.CharField(max_length=255, blank=True, null=True)
+    description = models.TextField( blank=True, null=True)
+
+    district = models.CharField(max_length=100, blank=True, null=True)
+    status = models.CharField(max_length=20,choices=STATUS_CHOICES,default="pending")
+
+    remark = models.TextField(blank=True, null=True)
+
+    action_taken_by = models.ForeignKey(
+        AllLog,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="problem_actions",
+        to_field="unique_id"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.problem_nature} - {self.status}"

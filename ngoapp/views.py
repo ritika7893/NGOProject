@@ -3,10 +3,10 @@ from django.shortcuts import render
 from decimal import Decimal
 from rest_framework.decorators import api_view,permission_classes
 from django.core.mail import send_mail
-from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DistrictMailSerializer, DonationSerializer, DonationSocietySerializer, FeedbackSerializer, LatestUpdateItemSerializer, MemberRegSerializer, RegionAdminSerializer
+from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AdminMailSerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DistrictMailSerializer, DonationSerializer, DonationSocietySerializer, FeedbackSerializer, LatestUpdateItemSerializer, MemberRegSerializer, RegionAdminSerializer, RegionMailSerializer
 from django.db import IntegrityError
-from .models import AboutUsItem, Activity, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, RegionAdmin
-from .permissions import  IsAdminOrDistrictAdminSelf, IsAdminOrDistrictOrRegionAdmin, IsAdminOrRegionAdminSelf, IsAdminOrSelfUser, IsAdminRole, IsDistrictAdmin
+from .models import AboutUsItem, Activity, AdminMail, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, RegionAdmin, RegionMail
+from .permissions import  IsAdminOrDistrictAdminSelf, IsAdminOrDistrictOrRegionAdmin, IsAdminOrRegionAdminSelf, IsAdminOrSelfUser, IsAdminRole, IsDistrictAdmin, IsRegionAdmin
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -1103,3 +1103,136 @@ def member_list_by_district(request):
     serializer = MemberRegSerializer(members, many=True)
 
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminMailAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated, IsAdminRole]  # or your custom admin permission
+
+    def post(self, request):
+
+        try:
+            admin = AllLog.objects.get(
+                unique_id=request.user.unique_id
+            )
+        except AllLog.DoesNotExist:
+            return Response(
+                {"success": False, "message": "Admin not found"},
+                status=403
+            )
+
+        serializer = AdminMailSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                member_ids = serializer.validated_data["member_ids"]
+
+                members = MemberReg.objects.filter(
+                    member_id__in=member_ids
+                )
+
+                if not members.exists():
+                    return Response(
+                        {"success": False, "message": "No valid members found"},
+                        status=400
+                    )
+
+                emails = members.values_list("email", flat=True)
+
+                send_mail(
+                    subject=serializer.validated_data["subject"],
+                    message=serializer.validated_data["message"],
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=list(emails),
+                    fail_silently=False,
+                )
+
+                AdminMail.objects.create(
+                    admin_id=admin,
+                    subject=serializer.validated_data["subject"],
+                    message=serializer.validated_data["message"],
+                    member_ids=list(
+                        members.values_list("member_id", flat=True)
+                    )
+                )
+
+                return Response(
+                    {"success": True, "message": "Mail sent successfully"},
+                    status=201
+                )
+
+            except Exception as e:
+                return Response(
+                    {"success": False, "message": str(e)},
+                    status=500
+                )
+
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=400
+        )
+class RegionMailAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated,  IsRegionAdmin]
+
+    def post(self, request):
+        try:
+            region_admin = AllLog.objects.get(
+                unique_id=request.user.unique_id
+            )
+        except AllLog.DoesNotExist:
+            return Response(
+                {"success": False, "message": "Region admin not found"},
+                status=403
+            )
+
+        serializer = RegionMailSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "errors": serializer.errors},
+                status=400
+            )
+
+        try:
+            member_ids = serializer.validated_data["member_ids"]
+
+            members = MemberReg.objects.filter(
+                member_id__in=member_ids
+            )
+
+            if not members.exists():
+                return Response(
+                    {"success": False, "message": "No valid members found"},
+                    status=400
+                )
+
+            emails = members.values_list("email", flat=True)
+
+            send_mail(
+                subject=serializer.validated_data["subject"],
+                message=serializer.validated_data["message"],
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=list(emails),
+                fail_silently=False,
+            )
+
+            RegionMail.objects.create(
+                region_admin_id=region_admin,
+                subject=serializer.validated_data["subject"],
+                message=serializer.validated_data["message"],
+                member_ids=list(
+                    members.values_list("member_id", flat=True)
+                )
+            )
+
+            return Response(
+                {"success": True, "message": "Mail sent successfully"},
+                status=201
+            )
+
+        except Exception as e:
+            return Response(
+                {"success": False, "message": str(e)},
+                status=500
+            )
