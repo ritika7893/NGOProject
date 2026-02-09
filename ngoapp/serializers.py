@@ -1,7 +1,7 @@
 from decimal import Decimal
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-from .models import AboutUsItem, Activity, AdminMail, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, AllLog, ProblemReport, RegionAdmin, RegionMail
+from .models import AboutUsItem, Activity, AdminMail, AssociativeWings, Blog, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, AllLog, ProblemReport, RegionAdmin, RegionMail
  # adjust import path if needed
 from django.utils import timezone
 from django.db import transaction,IntegrityError

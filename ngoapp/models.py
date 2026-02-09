@@ -308,7 +308,7 @@ class ProblemReport(models.Model):
 
     action_taken_by = models.ForeignKey( AllLog, on_delete=models.SET_NULL,null=True,blank=True, to_field="unique_id")
     solved_at = models.DateTimeField(blank=True,null=True)
-
+    action_taken_by_name = models.CharField( max_length=255,blank=True,null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     def save(self, *args, **kwargs):

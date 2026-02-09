@@ -4,9 +4,9 @@ from django.shortcuts import render
 from decimal import Decimal
 from rest_framework.decorators import api_view,permission_classes
 from django.core.mail import send_mail
-from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AdminMailSerializer, AssociativeWingsSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DistrictMailSerializer, DonationSerializer, DonationSocietySerializer, FeedbackSerializer, LatestUpdateItemSerializer, MemberRegSerializer, ProblemReportSerializer, RegionAdminSerializer, RegionMailSerializer
+from ngoapp.serializers import AboutUsItemSerializer, ActivitySerializer, AdminMailSerializer, AssociativeWingsSerializer, BlogSerializer, CarsouselItem1Serializer, ContactUsSerializer, DistrictAdminSerializer, DistrictMailSerializer, DonationSerializer, DonationSocietySerializer, FeedbackSerializer, LatestUpdateItemSerializer, MemberRegSerializer, ProblemReportSerializer, RegionAdminSerializer, RegionMailSerializer
 from django.db import IntegrityError
-from .models import AboutUsItem, Activity, AdminMail, AllLog, AssociativeWings, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, ProblemReport, RegionAdmin, RegionMail
+from .models import AboutUsItem, Activity, AdminMail, AllLog, AssociativeWings, Blog, CarsouselItem1, ContactUs, DistrictAdmin, DistrictMail, Donation, DonationSociety, Feedback, LatestUpdateItem, MemberReg, ProblemReport, RegionAdmin, RegionMail
 from .permissions import  IsAdminOrDistrictAdminSelf, IsAdminOrDistrictOrRegionAdmin, IsAdminOrRegionAdminSelf, IsAdminOrSelfUser, IsAdminRole, IsDistrictAdmin, IsRegionAdmin
 from django.shortcuts import render
 from rest_framework.views import APIView
@@ -758,7 +758,7 @@ class DistrictMailAPIView(APIView):
             return [IsAuthenticated(), IsDistrictAdmin()]
 
         if self.request.method == "GET":
-            return [IsAuthenticated(), IsAdminRole()]
+            return [IsAuthenticated(), IsAdminOrDistrictAdminSelf()]
 
         return [IsAuthenticated()]
     def get(self, request):
@@ -1211,7 +1211,7 @@ class RegionMailAPIView(APIView):
             return [IsAuthenticated(), IsRegionAdmin()]
 
         if self.request.method == "GET":
-            return [IsAuthenticated(), IsAdminRole()]
+            return [IsAuthenticated(), IsAdminOrRegionAdminSelf()]
 
         return [IsAuthenticated()]
     def post(self, request):
@@ -1381,7 +1381,10 @@ class ProblemReportAPIView(APIView):
                 status=404
             )
 
-        user = AllLog.objects.filter(unique_id=request.user.unique_id).first()
+        user = AllLog.objects.filter(
+            unique_id=request.user.unique_id
+        ).first()
+
         if not user:
             return Response(
                 {"success": False, "message": "Invalid user"},
@@ -1389,24 +1392,33 @@ class ProblemReportAPIView(APIView):
             )
 
         allowed = False
+        action_name = None
 
-        # ✅ Admin
+  
         if user.role == "admin":
             allowed = True
+            action_name = "Admin"  # or "Admin"
 
-        # ✅ Region Admin (allocated_district is LIST)
         elif user.role == "region-admin":
-            allowed = RegionAdmin.objects.filter(
+            region_admin = RegionAdmin.objects.filter(
                 region_admin_id=user.unique_id,
                 allocated_district__contains=[problem.district]
-            ).exists()
+            ).first()
 
-        # ✅ District Admin (allocated_district is STRING)
+            if region_admin:
+                allowed = True
+                action_name = region_admin.full_name
+
+        # ✅ DISTRICT ADMIN
         elif user.role == "district-admin":
-            allowed = DistrictAdmin.objects.filter(
+            district_admin = DistrictAdmin.objects.filter(
                 district_admin_id=user.unique_id,
                 allocated_district=problem.district
-            ).exists()
+            ).first()
+
+            if district_admin:
+                allowed = True
+                action_name = district_admin.full_name
 
         if not allowed:
             return Response(
@@ -1422,7 +1434,10 @@ class ProblemReportAPIView(APIView):
         )
 
         if serializer.is_valid():
-            serializer.save(action_taken_by=user)
+            serializer.save(
+                action_taken_by=user,
+                action_taken_by_name=action_name
+            )
             return Response(
                 {"success": True, "message": "Problem updated successfully"}
             )
