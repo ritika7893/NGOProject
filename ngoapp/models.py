@@ -178,17 +178,23 @@ class DonationSociety(models.Model):
 
 class CarsouselItem1(models.Model):
     title=models.CharField(max_length=200)
+    title_hi = models.CharField(max_length=200,blank=True,null=True)
     sub_title=models.CharField(max_length=200,blank=True,null=True)
+    sub_title_hi = models.CharField(max_length=200,blank=True,null=True)
     description=models.TextField(blank=True,null=True)
-    image=models.ImageField(upload_to="carousel_images/")
+    description_hi = models.TextField(blank=True,null=True)
+    image=models.ImageField(upload_to="carousel_images/",blank=True,null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 class AboutUsItem(models.Model):
     title=models.CharField(max_length=200)
-    description=models.TextField(blank=True,null=True)  
-    image=models.ImageField(upload_to="aboutus_images/")
+    title_hi = models.CharField(max_length=200,blank=True,null=True)
+    description=models.TextField(blank=True, null=True)
+    description_hi = models.TextField(blank=True, null=True)
     module=models.JSONField(default=list, blank=True, null=True)
+    module_hi=models.JSONField(default=list, blank=True, null=True) 
+    image=models.ImageField(upload_to="aboutus_images/")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -233,7 +239,9 @@ class DistrictMail(models.Model):
     
 class LatestUpdateItem(models.Model):
     title=models.CharField(max_length=200)
+    title_hi = models.CharField(max_length=200,blank=True,null=True)
     link=models.CharField(max_length=300,blank=True,null=True)
+    link_hi = models.CharField(max_length=300,blank=True,null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

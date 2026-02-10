@@ -477,24 +477,41 @@ class CarsouselItem1APIView(APIView):
 
    
     def get(self, request):
-       
+        lang = request.query_params.get("lang")  # None if not sent
         carousel_id = request.query_params.get("id")
+
+        def filter_by_lang(data):
+            if not lang:
+                return data
+
+            if lang == "hi":
+                # Remove English fields if Hindi requested
+                data.pop("title", None)
+                data.pop("sub_title", None)
+                data.pop("description", None)
+            else:  # English (default)
+                # Remove Hindi fields if English requested
+                data.pop("title_hi", None)
+                data.pop("sub_title_hi", None)
+                data.pop("description_hi", None)
+
+            return data
 
         if carousel_id:
             carousel = CarsouselItem1.objects.filter(id=carousel_id).first()
             if not carousel:
-                return Response({"success": False, "message": "Not found"}, status=404)
+                return Response({"success": False, "message": "Carousel item not found"}, status=404)
 
-            return Response({"success": True, "data": CarsouselItem1Serializer(carousel).data})
+            serializer = CarsouselItem1Serializer(carousel)
+            data = filter_by_lang(serializer.data)
+            return Response({"success": True, "data": data})
 
-        
-        return Response({
-            "success": True,
-            "data": CarsouselItem1Serializer(
-                CarsouselItem1.objects.all(),
-                many=True
-            ).data
-        })
+        # Get all carousel items
+        items = CarsouselItem1.objects.all().order_by("-id")
+        serializer = CarsouselItem1Serializer(items, many=True)
+        data = [filter_by_lang(item) for item in serializer.data]
+
+        return Response({"success": True, "data": data})
 
    
     def post(self, request):
@@ -536,8 +553,24 @@ class AboutUsItemAPIView(APIView):
 
 
     def get(self, request):
-       
+        lang = request.query_params.get("lang")  # None if not sent
         about_id = request.query_params.get("id")
+
+        def filter_by_lang(data):
+            # If lang NOT provided → return full serializer data
+            if not lang:
+                return data
+
+            if lang == "hi":
+                data.pop("title", None)
+                data.pop("description", None)
+                data.pop("module", None)
+            else:  # English (default)
+                data.pop("title_hi", None)
+                data.pop("description_hi", None)
+                data.pop("module_hi", None)
+
+            return data
 
         if about_id:
             about = AboutUsItem.objects.filter(id=about_id).first()
@@ -547,16 +580,15 @@ class AboutUsItemAPIView(APIView):
                     status=404
                 )
 
-            return Response(
-                {"success": True, "data": AboutUsItemSerializer(about).data}
-            )
-
-       
+            serializer = AboutUsItemSerializer(about)
+            data = filter_by_lang(serializer.data)
+            return Response({"success": True, "data": data})
 
         about_list = AboutUsItem.objects.all().order_by("-created_at")
-        return Response(
-            {"success": True, "data": AboutUsItemSerializer(about_list, many=True).data}
-        )
+        serializer = AboutUsItemSerializer(about_list, many=True)
+        data = [filter_by_lang(item) for item in serializer.data]
+
+        return Response({"success": True, "data": data})
 
     def post(self, request):
         serializer = AboutUsItemSerializer(data=request.data)
@@ -844,7 +876,21 @@ class LatestUpdateItemAPIView(APIView):
         return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
 
     def get(self, request):
+        lang = request.query_params.get("lang")  # hi / en / None
         item_id = request.query_params.get("id")
+
+        def filter_by_lang(data):
+            if not lang:
+                return data
+
+            if lang == "hi":
+                data.pop("title", None)
+                data.pop("link", None)
+            else:  
+                data.pop("title_hi", None)
+                data.pop("link_hi", None)
+
+            return data
 
         if item_id:
             item = LatestUpdateItem.objects.filter(id=item_id).first()
@@ -855,19 +901,23 @@ class LatestUpdateItemAPIView(APIView):
                 )
 
             serializer = LatestUpdateItemSerializer(item)
+            data = filter_by_lang(serializer.data)
+
             return Response({
                 "success": True,
-                "data": serializer.data
+                "data": data
             })
 
+     
         latest_updates = LatestUpdateItem.objects.all().order_by("-created_at")
         serializer = LatestUpdateItemSerializer(latest_updates, many=True)
 
+        data = [filter_by_lang(item) for item in serializer.data]
+
         return Response({
             "success": True,
-            "data": serializer.data
+            "data": data
         })
-
     def post(self, request):
         serializer = LatestUpdateItemSerializer(data=request.data)
         if serializer.is_valid():
